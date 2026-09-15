@@ -1,0 +1,5 @@
+interface:
+  display_name: "论文实验代码核验"
+  short_description: "核验论文实验声明、公开代码、配置与结果是否一致"
+  default_prompt: "使用 $paper-experiment-auditor 核验我的论文实验声明与准备上传 GitHub 的代码，并生成证据化审计报告。"
+
