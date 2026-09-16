@@ -1,0 +1,7 @@
+{
+  "case_id": "01-clean-control",
+  "title": "一致实现的干净对照",
+  "category": "CONTROL",
+  "description": "论文、配置、指标实现和结果文件相互一致，用于检测高严重性误报。"
+}
+

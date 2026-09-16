@@ -42,6 +42,29 @@ class RepositoryInventoryTests(unittest.TestCase):
             self.assertNotIn(".git/config", paths)
             self.assertTrue(any(item["path"] == ".env" for item in report["warnings"]))
 
+    def test_depth_and_custom_exclusion_are_respected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "keep").mkdir()
+            (root / "skip").mkdir()
+            (root / "deep" / "nested").mkdir(parents=True)
+            (root / "keep" / "visible.py").write_text("pass\n", encoding="utf-8")
+            (root / "skip" / "hidden.py").write_text("pass\n", encoding="utf-8")
+            (root / "deep" / "nested" / "too_deep.py").write_text("pass\n", encoding="utf-8")
+
+            completed = run_script(
+                "collect_repo_structure.py",
+                root,
+                "--max-depth",
+                1,
+                "--exclude",
+                "skip",
+            )
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            paths = [item["path"] for item in json.loads(completed.stdout)["files"]]
+            self.assertEqual(paths, ["keep/visible.py"])
+
 
 class ConfigCollectorTests(unittest.TestCase):
     def test_json_is_flattened_and_secrets_are_redacted(self) -> None:
@@ -81,6 +104,21 @@ class ConfigCollectorTests(unittest.TestCase):
             report = json.loads(completed.stdout)
             records = {(row["source"], row["key"]): row for row in report["records"]}
             self.assertEqual(records[(toml_path.name, "model.hidden_size")]["value"], 128)
+
+    def test_ini_and_nested_lists_are_flattened(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ini_path = root / "train.ini"
+            json_path = root / "augmentations.json"
+            ini_path.write_text("[training]\nepochs = 10\n", encoding="utf-8")
+            json_path.write_text(json.dumps({"steps": [{"name": "crop"}, {"name": "flip"}]}), encoding="utf-8")
+
+            completed = run_script("collect_config_values.py", ini_path, json_path)
+
+            self.assertEqual(completed.returncode, 0, completed.stderr)
+            records = {(row["source"], row["key"]): row["value"] for row in json.loads(completed.stdout)["records"]}
+            self.assertEqual(records[(ini_path.name, "training.epochs")], "10")
+            self.assertEqual(records[(json_path.name, "steps[1].name")], "flip")
 
 
 class ResultComparisonTests(unittest.TestCase):
@@ -138,6 +176,33 @@ class ResultComparisonTests(unittest.TestCase):
 
             self.assertEqual(completed.returncode, 2)
             self.assertIn("metric column is not present in both tables: f1", completed.stderr)
+
+    def test_missing_and_extra_rows_are_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = root / "expected.csv"
+            actual = root / "actual.csv"
+            expected.write_text("model,accuracy\nA,0.9\nB,0.8\n", encoding="utf-8")
+            actual.write_text("model,accuracy\nA,0.9\nC,0.7\n", encoding="utf-8")
+
+            completed = run_script("compare_result_tables.py", expected, actual, "--keys", "model")
+
+            self.assertEqual(completed.returncode, 1, completed.stderr)
+            kinds = [item["kind"] for item in json.loads(completed.stdout)["differences"]]
+            self.assertEqual(kinds, ["missing-row", "extra-row"])
+
+    def test_duplicate_row_keys_are_input_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            expected = root / "expected.csv"
+            actual = root / "actual.csv"
+            expected.write_text("model,accuracy\nA,0.9\nA,0.8\n", encoding="utf-8")
+            actual.write_text("model,accuracy\nA,0.9\n", encoding="utf-8")
+
+            completed = run_script("compare_result_tables.py", expected, actual, "--keys", "model")
+
+            self.assertEqual(completed.returncode, 2)
+            self.assertIn("duplicate key", completed.stderr)
 
 
 if __name__ == "__main__":

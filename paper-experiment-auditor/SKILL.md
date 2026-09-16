@@ -26,6 +26,7 @@ metadata:
 - 稿件与代码仓库齐全：完成稿件提取后，读取 [workflows/03-code-config-mapping.md](workflows/03-code-config-mapping.md) 和 [workflows/04-consistency-audit.md](workflows/04-consistency-audit.md)。
 - 用户要求运行、复现或验证结果：完成静态审计后，再读取 [workflows/05-reproduction-validation.md](workflows/05-reproduction-validation.md)。
 - 用户明确要求依据报告修复：读取 [workflows/06-remediation.md](workflows/06-remediation.md)，修复后重新核验受影响声明。
+- 用户要求评估或发布本 Skill 新版本：读取 [workflows/07-evaluation-and-release-gate.md](workflows/07-evaluation-and-release-gate.md)。评测 oracle 只能在核验输出完成后用于评分。
 
 不要默认读取所有参考文件。工作流会说明当前阶段需要读取哪些规则。
 
@@ -37,7 +38,7 @@ metadata:
 4. 核验数据、模型、训练、指标、基线、消融、随机性、结果汇总和发布完整性。
 5. 将每项判定写入 Claim–Code Matrix，发现编号为 `FND-###`。
 6. 如获授权，执行最小成本的动态验证，并记录命令、环境、输入、输出和退出状态。
-7. 使用固定模板生成报告，区分事实、推断、限制和建议。
+7. 使用固定模板生成报告，区分事实、推断、限制和建议；需要自动评测或下游处理时，同时生成结构化摘要。
 
 ## 确定性工具
 
@@ -46,6 +47,9 @@ metadata:
 - `scripts/collect_repo_structure.py`：生成仓库清单、类型统计和敏感文件名提醒。
 - `scripts/collect_config_values.py`：展开 JSON、TOML、INI/CFG 配置；安装 PyYAML 时也支持 YAML。
 - `scripts/compare_result_tables.py`：按行键和预先声明的数值容差比较 CSV、TSV 或 JSON 结果表。
+- `scripts/validate_audit_output.py`：校验结构化审计摘要的 ID、引用、证据门槛与覆盖率。
+- `scripts/validate_eval_fixtures.py`：校验行为评测案例及 oracle 的完整性和安全边界。
+- `scripts/grade_audit_case.py`：在隔离评测完成后按行为不变量评分，不比较固定措辞。
 
 脚本输出属于辅助证据。仓库清单不替代代码调用链分析；配置归集不证明某个值实际生效；表格相等不证明训练过程与论文一致。
 
@@ -68,5 +72,6 @@ metadata:
 - Claim–Code Matrix：采用 [templates/claim-code-matrix.md](templates/claim-code-matrix.md)。
 - 复现记录：采用 [templates/reproduction-log.md](templates/reproduction-log.md)。
 - 总体审计报告：采用 [templates/audit-report.md](templates/audit-report.md)。
+- 机器可读摘要：需要评测、自动化或下游消费时，读取 [references/audit-output-schema.md](references/audit-output-schema.md)，并采用 [templates/audit-summary.json](templates/audit-summary.json)。
 
-报告必须说明核验覆盖率、阻断性缺口和“可以随论文公开”结论的适用边界。若没有足够证据，不得给出无条件发布通过结论。
+报告必须说明核验覆盖率、阻断性缺口和“可以随论文公开”结论的适用边界。Markdown 与 JSON 中的 ID、状态、严重性和数量必须一致。若没有足够证据，不得给出无条件发布通过结论。

@@ -35,6 +35,8 @@
 - 问题描述必须包含期望、实际、证据、影响和最小建议。
 - 静态证据一致时最高判为 `CONSISTENT`。
 - 使用 `templates/claim-code-matrix.md` 和 `templates/audit-report.md`。
+- 为证据分配 `EVD-###`，并让 claim 与 finding 只引用已定义的证据 ID。
+- 用户需要机器可读交付物、自动评分或后续自动化时，读取 `references/audit-output-schema.md`，优先使用其中的规范 finding category，生成 `audit-summary.json`，并运行 `scripts/validate_audit_output.py`。
 
 ## 完成条件
 
@@ -42,3 +44,4 @@
 - 报告给出声明覆盖率和各状态数量。
 - 阻断 GitHub 发布复现的缺口被单独列出。
 - 所有发布建议均能追溯到具体发现。
+- 若生成结构化摘要，其校验结果有效，且与 Markdown 报告的状态和数量一致。

@@ -1,6 +1,6 @@
-# v0.2 确定性工具使用说明
+# v0.3 确定性工具使用说明
 
-三个工具均使用 Python 3，默认将 UTF-8 JSON 写到标准输出。只有需要保存审计附件时才使用 `--output`。脚本提供机械证据，不代替学术判断；输出必须与论文声明和调用路径结合后才能形成判定。
+六个工具均使用 Python 3，默认将 UTF-8 JSON 写到标准输出。只有需要保存审计附件时才使用 `--output`。脚本提供机械证据，不代替学术判断；输出必须与论文声明和调用路径结合后才能形成判定。
 
 ## 仓库结构归集
 
@@ -43,8 +43,28 @@ python scripts/compare_result_tables.py paper-values.csv reproduced-values.csv `
 | `collect_repo_structure.py` | 成功 | 未使用 | 输入或执行错误 |
 | `collect_config_values.py` | 成功 | 未使用 | 输入、格式或执行错误 |
 | `compare_result_tables.py` | 表格匹配 | 存在差异 | 输入、格式或执行错误 |
+| `validate_audit_output.py` | 有效且无警告 | 有效但有警告 | 输入或结构无效 |
+| `validate_eval_fixtures.py` | 全部案例有效 | 未使用 | 案例或输入无效 |
+| `grade_audit_case.py` | 评分通过 | 评分失败 | 输入或结构无效 |
 
 结果对比返回 1 表示成功完成比较并发现差异，不应误报为脚本崩溃。
+
+## 审计摘要校验
+
+```powershell
+python scripts/validate_audit_output.py audit-summary.json --format markdown
+```
+
+校验 schema 版本、ID 唯一性、跨引用、相对证据路径、`VERIFIED` 的运行证据门槛、覆盖率和发布准备度警告。字段定义见 `references/audit-output-schema.md`。
+
+## 行为评测工具
+
+```powershell
+python scripts/validate_eval_fixtures.py evals/cases
+python scripts/grade_audit_case.py evals/cases/02-config-override audit-summary.json --format markdown
+```
+
+先校验 fixture，再在被评测实例看不到 `oracle.json` 的条件下生成摘要，最后评分。案例结构、评分维度和门禁规则见 `references/behavioral-evaluation.md`。
 
 ## 校验工具
 
@@ -52,4 +72,4 @@ python scripts/compare_result_tables.py paper-values.csv reproduced-values.csv `
 python -m unittest discover -s tests -v
 ```
 
-在 Skill 根目录运行。测试覆盖仓库排除规则、敏感文件名提醒、配置展开与遮盖、数值容差和差异退出码。
+在 Skill 根目录运行。测试覆盖仓库归集、配置展开、结果比较、结构化输出约束、9 个 fixture 以及评分器的通过和阻断路径。

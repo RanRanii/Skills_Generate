@@ -1,0 +1,11 @@
+{
+  "training": {
+    "learning_rate": 0.001,
+    "epochs": 10,
+    "checkpoint": "best_validation"
+  },
+  "evaluation": {
+    "metric": "macro_f1"
+  }
+}
+

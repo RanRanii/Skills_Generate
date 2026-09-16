@@ -1,0 +1,7 @@
+{
+  "case_id": "03-data-leakage",
+  "title": "测试集参与标准化器拟合",
+  "category": "DATA_LEAKAGE",
+  "description": "数据预处理在合并训练集和测试集后拟合标准化参数。"
+}
+

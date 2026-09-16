@@ -1,0 +1,7 @@
+{
+  "case_id": "06-ineffective-ablation",
+  "title": "消融开关未改变模型构建",
+  "category": "INEFFECTIVE_ABLATION",
+  "description": "配置声明关闭 attention，但模型始终实例化并调用该模块。"
+}
+

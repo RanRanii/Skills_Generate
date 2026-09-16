@@ -1,0 +1,6 @@
+{
+  "case_id": "07-incomplete-seeding",
+  "title": "Model initialization occurs before seeding",
+  "description": "The manuscript claims deterministic initialization, but the code seeds Python only after drawing the initial model weight.",
+  "category": "INCOMPLETE_SEEDING"
+}

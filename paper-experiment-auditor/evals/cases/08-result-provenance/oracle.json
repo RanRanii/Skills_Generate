@@ -1,0 +1,28 @@
+{
+  "required_findings": [
+    {
+      "category": "RESULT_PROVENANCE_BREAK",
+      "allowed_claim_statuses": [
+        "UNVERIFIABLE"
+      ],
+      "allowed_severities": [
+        "BLOCKER"
+      ],
+      "required_evidence_types": [
+        "CODE",
+        "ARTIFACT"
+      ],
+      "fixture_paths": [
+        "repository/src/plot.py",
+        "repository/results/paper_table.csv"
+      ],
+      "blocking": true
+    }
+  ],
+  "forbidden_categories": [],
+  "forbidden_severities": [],
+  "expected_release_readiness": [
+    "BLOCKED"
+  ],
+  "max_high_severity_false_positives": 0
+}

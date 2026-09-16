@@ -32,13 +32,13 @@
 4. 指标或结果聚合的确定性样例验证。
 5. 用户授权后的完整或缩减复现。
 
-每次运行记录命令、工作目录、提交哈希、环境、输入、随机种子、退出码、关键输出和产物路径。使用 `templates/reproduction-log.md`。
+每次运行记录命令、工作目录、提交哈希、环境、输入、随机种子、退出码、关键输出和产物路径。使用 `templates/reproduction-log.md`，并为可复查的运行记录分配 `RUNTIME` 类型 `EVD-###`。
 
 若复现输出与论文结果均可整理为结构化表格，可按 `references/script-usage.md` 使用 `scripts/compare_result_tables.py` 保存可复查的差异记录。容差必须在执行比较前写入复现记录。
 
 ## 判定升级
 
-只有当运行证据直接覆盖声明、产物可追溯且偏差在预先定义的容差内时，才可从 `CONSISTENT` 升级为 `VERIFIED`。smoke test 只能验证流程可启动，不能验证论文结果已复现。
+只有当链接到该声明的 `RUNTIME` 证据直接覆盖声明、代码版本与配置可识别、产物可追溯且偏差在预先定义的容差内时，才可从 `CONSISTENT` 升级为 `VERIFIED`。smoke test 只能验证流程可启动，不能验证论文结果已复现。若生成 `audit-summary.json`，升级状态后必须再次运行结构校验。
 
 ## 失败处理
 

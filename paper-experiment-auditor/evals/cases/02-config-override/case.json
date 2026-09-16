@@ -1,0 +1,7 @@
+{
+  "case_id": "02-config-override",
+  "title": "启动脚本覆盖论文学习率",
+  "category": "CONFIG_OVERRIDE",
+  "description": "配置文件与论文一致，但实际入口在加载后覆盖学习率。"
+}
+

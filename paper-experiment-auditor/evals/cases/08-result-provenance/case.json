@@ -1,0 +1,6 @@
+{
+  "case_id": "08-result-provenance",
+  "title": "Reported result lacks a traceable source artifact",
+  "description": "The plotting script expects a missing final results table while the repository contains only a manually curated paper table.",
+  "category": "RESULT_PROVENANCE_BREAK"
+}

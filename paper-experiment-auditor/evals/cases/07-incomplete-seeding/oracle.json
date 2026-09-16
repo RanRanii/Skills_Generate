@@ -1,0 +1,28 @@
+{
+  "required_findings": [
+    {
+      "category": "INCOMPLETE_SEEDING",
+      "allowed_claim_statuses": [
+        "MISMATCH"
+      ],
+      "allowed_severities": [
+        "MODERATE"
+      ],
+      "required_evidence_types": [
+        "CODE"
+      ],
+      "fixture_paths": [
+        "repository/src/train.py"
+      ],
+      "blocking": false
+    }
+  ],
+  "forbidden_categories": [],
+  "forbidden_severities": [
+    "BLOCKER"
+  ],
+  "expected_release_readiness": [
+    "CONDITIONAL"
+  ],
+  "max_high_severity_false_positives": 0
+}

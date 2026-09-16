@@ -1,0 +1,6 @@
+{
+  "case_id": "09-ambiguous-manuscript",
+  "title": "Manuscript omits split details",
+  "description": "The code defines a deterministic 80/20 split, but the manuscript only says that a random split was used.",
+  "category": "MANUSCRIPT_AMBIGUITY"
+}

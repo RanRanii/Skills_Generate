@@ -1,0 +1,31 @@
+{
+  "required_findings": [
+    {
+      "category": "MANUSCRIPT_AMBIGUITY",
+      "allowed_claim_statuses": [
+        "AMBIGUOUS"
+      ],
+      "allowed_severities": [
+        "MODERATE"
+      ],
+      "required_evidence_types": [
+        "PAPER",
+        "CODE"
+      ],
+      "fixture_paths": [
+        "manuscript.md",
+        "repository/src/split.py"
+      ],
+      "blocking": false
+    }
+  ],
+  "forbidden_categories": [],
+  "forbidden_severities": [
+    "BLOCKER"
+  ],
+  "expected_release_readiness": [
+    "CONDITIONAL",
+    "UNKNOWN"
+  ],
+  "max_high_severity_false_positives": 0
+}

@@ -1,0 +1,53 @@
+{
+  "schema_version": "0.3",
+  "audit_id": "AUD-001",
+  "scope": {
+    "manuscript": "manuscript.md",
+    "repository": "repository",
+    "commit": "working-tree"
+  },
+  "claims": [
+    {
+      "claim_id": "CLM-001",
+      "statement": "论文声明示例",
+      "status": "MISMATCH",
+      "evidence_ids": [
+        "EVD-001"
+      ],
+      "finding_ids": [
+        "FND-001"
+      ]
+    }
+  ],
+  "evidence": [
+    {
+      "evidence_id": "EVD-001",
+      "type": "CODE",
+      "path": "src/train.py",
+      "locator": "train",
+      "observation": "实现与论文声明不一致"
+    }
+  ],
+  "findings": [
+    {
+      "finding_id": "FND-001",
+      "category": "IMPLEMENTATION_MISMATCH",
+      "severity": "MAJOR",
+      "claim_ids": [
+        "CLM-001"
+      ],
+      "evidence_ids": [
+        "EVD-001"
+      ],
+      "expected": "论文描述的行为",
+      "actual": "代码实际行为",
+      "impact": "可能改变论文实验结论"
+    }
+  ],
+  "coverage": {
+    "total_claims": 1,
+    "mapped_claims": 1
+  },
+  "release_readiness": "BLOCKED"
+}
+

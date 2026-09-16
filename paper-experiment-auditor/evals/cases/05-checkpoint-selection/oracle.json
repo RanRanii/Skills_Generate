@@ -1,0 +1,28 @@
+{
+  "required_findings": [
+    {
+      "category": "CHECKPOINT_SELECTION",
+      "allowed_claim_statuses": [
+        "MISMATCH"
+      ],
+      "allowed_severities": [
+        "MAJOR"
+      ],
+      "required_evidence_types": [
+        "CODE"
+      ],
+      "fixture_paths": [
+        "repository/src/evaluate.py"
+      ],
+      "blocking": true
+    }
+  ],
+  "forbidden_categories": [],
+  "forbidden_severities": [],
+  "expected_release_readiness": [
+    "BLOCKED",
+    "CONDITIONAL"
+  ],
+  "max_high_severity_false_positives": 0
+}
+

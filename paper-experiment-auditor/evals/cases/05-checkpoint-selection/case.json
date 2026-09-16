@@ -1,0 +1,7 @@
+{
+  "case_id": "05-checkpoint-selection",
+  "title": "评估加载最后而非最佳 checkpoint",
+  "category": "CHECKPOINT_SELECTION",
+  "description": "论文要求最佳验证模型，评估入口按文件名选择最后 epoch。"
+}
+

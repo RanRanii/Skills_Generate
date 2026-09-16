@@ -1,0 +1,22 @@
+{
+  "required_findings": [],
+  "forbidden_categories": [
+    "CONFIG_OVERRIDE",
+    "DATA_LEAKAGE",
+    "METRIC_MISMATCH",
+    "CHECKPOINT_SELECTION",
+    "INEFFECTIVE_ABLATION",
+    "INCOMPLETE_SEEDING",
+    "RESULT_PROVENANCE_BREAK"
+  ],
+  "forbidden_severities": [
+    "BLOCKER",
+    "MAJOR"
+  ],
+  "expected_release_readiness": [
+    "READY",
+    "CONDITIONAL"
+  ],
+  "max_high_severity_false_positives": 0
+}
+

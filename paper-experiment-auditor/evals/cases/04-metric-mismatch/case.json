@@ -1,0 +1,7 @@
+{
+  "case_id": "04-metric-mismatch",
+  "title": "macro-F1 与 micro-F1 不一致",
+  "category": "METRIC_MISMATCH",
+  "description": "论文声明 macro-F1，评估函数实际请求 micro 平均。"
+}
+
