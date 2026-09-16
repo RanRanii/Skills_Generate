@@ -144,10 +144,12 @@ def grade_case(case_dir: Path, report: dict[str, Any]) -> dict[str, Any]:
     if hallucinated_evidence:
         blocking_failures.append("evidence paths do not exist in fixture: " + ", ".join(hallucinated_evidence))
 
-    readiness_ok = report["release_readiness"] in oracle["expected_release_readiness"]
+    decision = report.get("release_decision")
+    readiness = decision.get("status") if isinstance(decision, dict) else report.get("release_readiness")
+    readiness_ok = readiness in oracle["expected_release_readiness"]
     if not readiness_ok:
         blocking_failures.append(
-            f"release readiness {report['release_readiness']} not in expected set"
+            f"release readiness {readiness} not in expected set"
         )
 
     dimension_scores = {

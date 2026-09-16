@@ -21,19 +21,27 @@ CLAIM_STATUSES = {
 }
 EVIDENCE_TYPES = {"PAPER", "CODE", "CONFIG", "ARTIFACT", "RUNTIME", "DOC"}
 SEVERITIES = {"BLOCKER", "MAJOR", "MODERATE", "MINOR", "INFO"}
-RELEASE_READINESS = {"READY", "CONDITIONAL", "BLOCKED", "UNKNOWN"}
+RELEASE_STATUSES = {"READY", "CONDITIONAL", "BLOCKED", "UNKNOWN"}
+AUDIT_PROFILES = {"TRIAGE", "STATIC_AUDIT", "REPRODUCTION", "REMEDIATION", "RELEASE_REVIEW"}
+CLAIM_TYPES = {"DATA", "METHOD", "TRAINING", "METRIC", "RESULT", "RELEASE"}
+CRITICALITIES = {"CORE", "SUPPORTING", "OPERATIONAL"}
+EVIDENCE_STRENGTHS = {"DIRECT", "INDIRECT", "SUPPORTING"}
+GENERATED_BY = {"HUMAN", "SCRIPT", "COMMAND"}
+DISPOSITIONS = {"OPEN", "FIXED", "ACCEPTED_RISK", "WAIVED"}
 ID_PATTERNS = {
     "claim_id": re.compile(r"^CLM-\d{3,}$"),
     "evidence_id": re.compile(r"^EVD-\d{3,}$"),
     "finding_id": re.compile(r"^FND-\d{3,}$"),
 }
 CATEGORY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
+DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-fA-F]{64}$")
 WINDOWS_ABSOLUTE = re.compile(r"^[A-Za-z]:[\\/]")
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("audit_summary", type=Path, help="audit-summary.json to validate")
+    parser.add_argument("--repo-root", type=Path, help="Verify evidence paths exist under this repository root")
     parser.add_argument("--format", choices=("json", "markdown"), default="json")
     parser.add_argument("--output", type=Path, help="Write validation report to this file")
     return parser.parse_args()
@@ -62,6 +70,13 @@ def add_required_string_errors(item: dict[str, Any], fields: tuple[str, ...], pr
     for field in fields:
         if not nonempty_string(item.get(field)):
             errors.append(f"{prefix}.{field} must be a non-empty string")
+
+
+def enum_field(item: dict[str, Any], field: str, allowed: set[str], prefix: str, errors: list[str]) -> None:
+    """Validate an optional enum field when it is present."""
+    value = item.get(field)
+    if value is not None and value not in allowed:
+        errors.append(f"{prefix}.{field} must be one of {sorted(allowed)}")
 
 
 def validate_ids(
@@ -100,22 +115,33 @@ def string_list(value: Any, prefix: str, errors: list[str]) -> list[str]:
     return [str(item) for item in value]
 
 
-def validate_report(data: Any) -> dict[str, Any]:
+def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
     errors: list[str] = []
     warnings: list[str] = []
     if not isinstance(data, dict):
         return {"valid": False, "errors": ["audit summary must be a JSON object"], "warnings": []}
 
-    if str(data.get("schema_version")) != "0.3":
-        errors.append("schema_version must be '0.3'")
+    version = str(data.get("schema_version"))
+    if version not in {"1.0", "0.3"}:
+        errors.append("schema_version must be '1.0' (or '0.3' for backward compatibility)")
+    is_v1 = version == "1.0"
+    if not is_v1:
+        warnings.append("schema_version '0.3' is deprecated; upgrade to '1.0'")
+
     if not nonempty_string(data.get("audit_id")):
         errors.append("audit_id must be a non-empty string")
 
-    scope = data.get("scope")
-    if not isinstance(scope, dict):
-        errors.append("scope must be an object")
+    subject = data.get("subject") if is_v1 else data.get("scope")
+    subject_label = "subject" if is_v1 else "scope"
+    if not isinstance(subject, dict):
+        errors.append(f"{subject_label} must be an object")
     else:
-        add_required_string_errors(scope, ("manuscript", "repository", "commit"), "scope", errors)
+        add_required_string_errors(subject, ("manuscript", "repository", "commit"), subject_label, errors)
+
+    if is_v1:
+        profile = data.get("audit_profile")
+        if profile not in AUDIT_PROFILES:
+            errors.append(f"audit_profile must be one of {sorted(AUDIT_PROFILES)}")
 
     claims, claim_index = validate_ids(data.get("claims"), "claim_id", "claims", errors)
     evidence, evidence_index = validate_ids(data.get("evidence"), "evidence_id", "evidence", errors)
@@ -126,9 +152,28 @@ def validate_report(data: Any) -> dict[str, Any]:
         evidence_type = item.get("type")
         if evidence_type not in EVIDENCE_TYPES:
             errors.append(f"{prefix}.type must be one of {sorted(EVIDENCE_TYPES)}")
-        add_required_string_errors(item, ("path", "locator", "observation"), prefix, errors)
-        if item.get("path") is not None and not relative_evidence_path(item.get("path")):
-            errors.append(f"{prefix}.path must be a safe relative path")
+            continue
+        add_required_string_errors(item, ("observation",), prefix, errors)
+        if is_v1:
+            enum_field(item, "strength", EVIDENCE_STRENGTHS, prefix, errors)
+            enum_field(item, "generated_by", GENERATED_BY, prefix, errors)
+            digest = item.get("digest")
+            if digest is not None and (not isinstance(digest, str) or not DIGEST_PATTERN.fullmatch(digest)):
+                errors.append(f"{prefix}.digest must be a sha256:<64-hex> string")
+        if evidence_type == "RUNTIME":
+            if is_v1:
+                add_required_string_errors(item, ("command", "commit", "artifact"), prefix, errors)
+                exit_status = item.get("exit_status")
+                if not isinstance(exit_status, int) or isinstance(exit_status, bool):
+                    errors.append(f"{prefix}.exit_status must be an integer")
+                if item.get("artifact") is not None and not relative_evidence_path(item.get("artifact")):
+                    errors.append(f"{prefix}.artifact must be a safe relative path")
+            else:
+                add_required_string_errors(item, ("path", "locator"), prefix, errors)
+        else:
+            add_required_string_errors(item, ("path", "locator"), prefix, errors)
+            if item.get("path") is not None and not relative_evidence_path(item.get("path")):
+                errors.append(f"{prefix}.path must be a safe relative path")
 
     for index, item in enumerate(findings):
         prefix = f"findings[{index}]"
@@ -137,6 +182,17 @@ def validate_report(data: Any) -> dict[str, Any]:
             errors.append(f"{prefix}.category must use UPPER_SNAKE_CASE")
         if item.get("severity") not in SEVERITIES:
             errors.append(f"{prefix}.severity must be one of {sorted(SEVERITIES)}")
+        if is_v1:
+            enum_field(item, "disposition", DISPOSITIONS, prefix, errors)
+            recommendation = item.get("recommendation")
+            if recommendation is not None and not nonempty_string(recommendation):
+                errors.append(f"{prefix}.recommendation must be a non-empty string")
+            resolution_ids = string_list(item.get("resolution_evidence_ids"), f"{prefix}.resolution_evidence_ids", errors)
+            for identifier in resolution_ids:
+                if identifier not in evidence_index:
+                    errors.append(f"{prefix} references unknown evidence in resolution_evidence_ids: {identifier}")
+            if item.get("disposition") == "FIXED" and not resolution_ids:
+                warnings.append(f"{prefix} is FIXED without resolution evidence")
         add_required_string_errors(item, ("expected", "actual", "impact"), prefix, errors)
         claim_ids = string_list(item.get("claim_ids"), f"{prefix}.claim_ids", errors)
         evidence_ids = string_list(item.get("evidence_ids"), f"{prefix}.evidence_ids", errors)
@@ -154,6 +210,12 @@ def validate_report(data: Any) -> dict[str, Any]:
     for index, item in enumerate(claims):
         prefix = f"claims[{index}]"
         add_required_string_errors(item, ("statement",), prefix, errors)
+        if is_v1:
+            enum_field(item, "claim_type", CLAIM_TYPES, prefix, errors)
+            enum_field(item, "criticality", CRITICALITIES, prefix, errors)
+            source_locator = item.get("source_locator")
+            if source_locator is not None and not nonempty_string(source_locator):
+                errors.append(f"{prefix}.source_locator must be a non-empty string")
         status = item.get("status")
         if status not in CLAIM_STATUSES:
             errors.append(f"{prefix}.status must be one of {sorted(CLAIM_STATUSES)}")
@@ -176,6 +238,17 @@ def validate_report(data: Any) -> dict[str, Any]:
         if status in {"UNVERIFIABLE", "AMBIGUOUS"} and not finding_ids:
             warnings.append(f"{prefix} status {status} has no explanatory finding")
 
+    # Bidirectional reference: every finding must be cited by at least one claim.
+    cited_findings = {
+        identifier
+        for item in claims
+        for identifier in item.get("finding_ids", [])
+        if isinstance(identifier, str)
+    }
+    orphan_findings = sorted(set(finding_index) - cited_findings)
+    if orphan_findings:
+        errors.append(f"findings not referenced by any claim: {', '.join(orphan_findings)}")
+
     coverage = data.get("coverage")
     if not isinstance(coverage, dict):
         errors.append("coverage must be an object")
@@ -192,14 +265,66 @@ def validate_report(data: Any) -> dict[str, Any]:
         elif mapped != expected_mapped:
             errors.append("coverage.mapped_claims does not match claims with evidence")
 
-    readiness = data.get("release_readiness")
-    if readiness not in RELEASE_READINESS:
-        errors.append(f"release_readiness must be one of {sorted(RELEASE_READINESS)}")
-    if readiness == "READY":
-        if any(item.get("severity") in {"BLOCKER", "MAJOR"} for item in findings):
-            warnings.append("release_readiness is READY despite BLOCKER or MAJOR findings")
-        if any(item.get("status") in {"MISMATCH", "UNVERIFIABLE"} for item in claims):
-            warnings.append("release_readiness is READY despite unresolved claims")
+    if is_v1:
+        decision = data.get("release_decision")
+        if not isinstance(decision, dict):
+            errors.append("release_decision must be an object")
+        else:
+            status = decision.get("status")
+            if status not in RELEASE_STATUSES:
+                errors.append(f"release_decision.status must be one of {sorted(RELEASE_STATUSES)}")
+            if not nonempty_string(decision.get("rationale")):
+                errors.append("release_decision.rationale must be a non-empty string")
+            for field in ("blocking_finding_ids", "conditional_finding_ids"):
+                ids = string_list(decision.get(field), f"release_decision.{field}", errors)
+                for identifier in ids:
+                    if identifier not in finding_index:
+                        errors.append(f"release_decision.{field} references unknown finding: {identifier}")
+            if status == "READY":
+                if any(
+                    item.get("severity") in {"BLOCKER", "MAJOR"} and item.get("disposition", "OPEN") == "OPEN"
+                    for item in findings
+                ):
+                    errors.append("release_decision is READY despite unresolved BLOCKER or MAJOR findings")
+                core_claims = [item for item in claims if item.get("criticality") == "CORE"]
+                if any(not item.get("evidence_ids") for item in core_claims):
+                    errors.append("release_decision is READY but CORE claims lack evidence")
+                if any(item.get("status") in {"MISMATCH", "UNVERIFIABLE"} for item in core_claims):
+                    errors.append("release_decision is READY but CORE claims are MISMATCH or UNVERIFIABLE")
+        limitations = data.get("limitations")
+        if limitations is None or not isinstance(limitations, list):
+            errors.append("limitations must be an array")
+        else:
+            string_list(limitations, "limitations", errors)
+    else:
+        readiness = data.get("release_readiness")
+        if readiness not in RELEASE_STATUSES:
+            errors.append(f"release_readiness must be one of {sorted(RELEASE_STATUSES)}")
+        if readiness == "READY":
+            if any(item.get("severity") in {"BLOCKER", "MAJOR"} for item in findings):
+                warnings.append("release_readiness is READY despite BLOCKER or MAJOR findings")
+            if any(item.get("status") in {"MISMATCH", "UNVERIFIABLE"} for item in claims):
+                warnings.append("release_readiness is READY despite unresolved claims")
+
+    if repo_root is not None:
+        root = Path(repo_root)
+        if not root.is_dir():
+            errors.append(f"--repo-root is not a directory: {root}")
+        else:
+            resolved_root = root.resolve()
+            for index, item in enumerate(evidence):
+                prefix = f"evidence[{index}]"
+                path_value = item.get("artifact") if item.get("type") == "RUNTIME" else item.get("path")
+                if not relative_evidence_path(path_value):
+                    continue  # already reported as an unsafe/missing path
+                normalized = str(path_value).replace("\\", "/")
+                target = root / normalized
+                try:
+                    resolved = target.resolve()
+                except OSError:
+                    resolved = None
+                if resolved is None or not resolved.is_file() or not resolved.is_relative_to(resolved_root):
+                    errors.append(f"{prefix} path does not exist under repository root: {normalized}")
 
     used_evidence = {
         identifier
@@ -240,7 +365,7 @@ def markdown_report(result: dict[str, Any]) -> str:
 def main() -> int:
     args = parse_args()
     try:
-        result = validate_report(load_json(args.audit_summary))
+        result = validate_report(load_json(args.audit_summary), repo_root=args.repo_root)
         rendered = (
             json.dumps(result, ensure_ascii=False, indent=2) + "\n"
             if args.format == "json"

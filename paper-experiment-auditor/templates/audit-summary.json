@@ -1,7 +1,8 @@
 {
-  "schema_version": "0.3",
+  "schema_version": "1.0",
   "audit_id": "AUD-001",
-  "scope": {
+  "audit_profile": "STATIC_AUDIT",
+  "subject": {
     "manuscript": "manuscript.md",
     "repository": "repository",
     "commit": "working-tree"
@@ -9,6 +10,9 @@
   "claims": [
     {
       "claim_id": "CLM-001",
+      "claim_type": "METRIC",
+      "criticality": "CORE",
+      "source_locator": "Table 2, row 1",
       "statement": "论文声明示例",
       "status": "MISMATCH",
       "evidence_ids": [
@@ -23,6 +27,8 @@
     {
       "evidence_id": "EVD-001",
       "type": "CODE",
+      "strength": "DIRECT",
+      "generated_by": "HUMAN",
       "path": "src/train.py",
       "locator": "train",
       "observation": "实现与论文声明不一致"
@@ -31,8 +37,9 @@
   "findings": [
     {
       "finding_id": "FND-001",
-      "category": "IMPLEMENTATION_MISMATCH",
+      "category": "METHOD_MISMATCH",
       "severity": "MAJOR",
+      "disposition": "OPEN",
       "claim_ids": [
         "CLM-001"
       ],
@@ -41,13 +48,24 @@
       ],
       "expected": "论文描述的行为",
       "actual": "代码实际行为",
-      "impact": "可能改变论文实验结论"
+      "impact": "可能改变论文实验结论",
+      "recommendation": "对齐实现与论文描述",
+      "resolution_evidence_ids": []
     }
   ],
   "coverage": {
     "total_claims": 1,
     "mapped_claims": 1
   },
-  "release_readiness": "BLOCKED"
+  "release_decision": {
+    "status": "BLOCKED",
+    "blocking_finding_ids": [
+      "FND-001"
+    ],
+    "conditional_finding_ids": [],
+    "rationale": "核心声明存在未解决的 MISMATCH"
+  },
+  "limitations": [
+    "未执行动态复现"
+  ]
 }
-

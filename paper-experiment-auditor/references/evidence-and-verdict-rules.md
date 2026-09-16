@@ -15,6 +15,8 @@
 
 从强到弱通常为：实际生效的运行记录、入口可达的源码和配置、生成产物、发布文档、注释或未被调用的示例。实际冲突时不得通过弱证据覆盖强证据。
 
+结构化摘要中的 `strength`（`DIRECT`、`INDIRECT`、`SUPPORTING`）与 `generated_by`（`HUMAN`、`SCRIPT`、`COMMAND`）字段是上述排序的机器可读近似表达，判定时仍以本节排序为准。
+
 ## 状态判定
 
 ### VERIFIED

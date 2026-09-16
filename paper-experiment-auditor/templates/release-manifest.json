@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "repository": ".",
+  "documentation": [
+    "README.md"
+  ],
+  "install": {
+    "command": "pip install -r requirements.txt",
+    "environment_files": [
+      "requirements.txt"
+    ]
+  },
+  "data_preparation": {
+    "command": "python src/prepare_data.py --config configs/prepare.json",
+    "entry": "src/prepare_data.py"
+  },
+  "training": {
+    "command": "python src/train.py --config configs/train.json",
+    "entry": "src/train.py"
+  },
+  "evaluation": {
+    "command": "python src/evaluate.py --config configs/eval.json",
+    "entry": "src/evaluate.py"
+  },
+  "result_generation": {
+    "command": "python src/plot.py",
+    "entry": "src/plot.py"
+  },
+  "default_configs": [
+    "configs/train.json",
+    "configs/eval.json"
+  ],
+  "checkpoints": {
+    "acquisition": "download from https://zenodo.org/record/<id>",
+    "paths": [
+      "checkpoints/model.pt"
+    ]
+  },
+  "expected_outputs": [
+    "results/summary.csv",
+    "figures/fig1.png"
+  ],
+  "license": "MIT",
+  "data_restrictions": "training data is not redistributed; obtain it via src/prepare_data.py"
+}

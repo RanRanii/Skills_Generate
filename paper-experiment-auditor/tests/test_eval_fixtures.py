@@ -26,9 +26,10 @@ def run_script(name: str, *args: object) -> subprocess.CompletedProcess[str]:
 
 def config_override_report() -> dict[str, object]:
     return {
-        "schema_version": "0.3",
+        "schema_version": "1.0",
         "audit_id": "AUD-EVAL-02",
-        "scope": {
+        "audit_profile": "STATIC_AUDIT",
+        "subject": {
             "manuscript": "manuscript.md",
             "repository": "repository",
             "commit": "fixture",
@@ -36,6 +37,9 @@ def config_override_report() -> dict[str, object]:
         "claims": [
             {
                 "claim_id": "CLM-001",
+                "claim_type": "TRAINING",
+                "criticality": "CORE",
+                "source_locator": "Section 3.1",
                 "statement": "Training uses a learning rate of 0.001.",
                 "status": "MISMATCH",
                 "evidence_ids": ["EVD-001", "EVD-002"],
@@ -46,6 +50,8 @@ def config_override_report() -> dict[str, object]:
             {
                 "evidence_id": "EVD-001",
                 "type": "CONFIG",
+                "strength": "DIRECT",
+                "generated_by": "HUMAN",
                 "path": "configs/train.json",
                 "locator": "learning_rate",
                 "observation": "The file declares 0.001.",
@@ -53,6 +59,8 @@ def config_override_report() -> dict[str, object]:
             {
                 "evidence_id": "EVD-002",
                 "type": "CODE",
+                "strength": "DIRECT",
+                "generated_by": "HUMAN",
                 "path": "src/run.py",
                 "locator": "effective_config",
                 "observation": "The launcher replaces the value with 0.01.",
@@ -63,15 +71,24 @@ def config_override_report() -> dict[str, object]:
                 "finding_id": "FND-001",
                 "category": "CONFIG_OVERRIDE",
                 "severity": "MAJOR",
+                "disposition": "OPEN",
                 "claim_ids": ["CLM-001"],
                 "evidence_ids": ["EVD-001", "EVD-002"],
                 "expected": "0.001",
                 "actual": "0.01",
                 "impact": "The effective protocol differs from the paper.",
+                "recommendation": "Align the launcher with the manuscript.",
+                "resolution_evidence_ids": [],
             }
         ],
         "coverage": {"total_claims": 1, "mapped_claims": 1},
-        "release_readiness": "BLOCKED",
+        "release_decision": {
+            "status": "BLOCKED",
+            "blocking_finding_ids": ["FND-001"],
+            "conditional_finding_ids": [],
+            "rationale": "Effective training config conflicts with the manuscript.",
+        },
+        "limitations": ["No dynamic reproduction was run."],
     }
 
 

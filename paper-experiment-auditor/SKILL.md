@@ -47,7 +47,8 @@ metadata:
 - `scripts/collect_repo_structure.py`：生成仓库清单、类型统计和敏感文件名提醒。
 - `scripts/collect_config_values.py`：展开 JSON、TOML、INI/CFG 配置；安装 PyYAML 时也支持 YAML。
 - `scripts/compare_result_tables.py`：按行键和预先声明的数值容差比较 CSV、TSV 或 JSON 结果表。
-- `scripts/validate_audit_output.py`：校验结构化审计摘要的 ID、引用、证据门槛与覆盖率。
+- `scripts/validate_audit_output.py`：校验结构化审计摘要（`1.0` 契约，兼容 `0.3`）的 ID、引用、证据门槛、覆盖率与发布决定；`--repo-root` 可核验证据路径是否存在。
+- `scripts/check_release_package.py`：核验发布清单声明的入口、配置、产物与 checkpoint 是否存在于仓库内且路径安全。
 - `scripts/validate_eval_fixtures.py`：校验行为评测案例及 oracle 的完整性和安全边界。
 - `scripts/grade_audit_case.py`：在隔离评测完成后按行为不变量评分，不比较固定措辞。
 
@@ -72,6 +73,7 @@ metadata:
 - Claim–Code Matrix：采用 [templates/claim-code-matrix.md](templates/claim-code-matrix.md)。
 - 复现记录：采用 [templates/reproduction-log.md](templates/reproduction-log.md)。
 - 总体审计报告：采用 [templates/audit-report.md](templates/audit-report.md)。
-- 机器可读摘要：需要评测、自动化或下游消费时，读取 [references/audit-output-schema.md](references/audit-output-schema.md)，并采用 [templates/audit-summary.json](templates/audit-summary.json)。
+- 机器可读摘要：需要评测、自动化或下游消费时，读取 [references/audit-output-schema.md](references/audit-output-schema.md)，并采用 [templates/audit-summary.json](templates/audit-summary.json)。finding 的规范类别见 [references/finding-taxonomy.md](references/finding-taxonomy.md)。
+- 发布清单：进行发布完整性检查时，采用 [templates/release-manifest.json](templates/release-manifest.json)，规范见 [references/release-manifest-schema.md](references/release-manifest-schema.md)。
 
 报告必须说明核验覆盖率、阻断性缺口和“可以随论文公开”结论的适用边界。Markdown 与 JSON 中的 ID、状态、严重性和数量必须一致。若没有足够证据，不得给出无条件发布通过结论。

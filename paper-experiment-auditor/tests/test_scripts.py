@@ -205,5 +205,102 @@ class ResultComparisonTests(unittest.TestCase):
             self.assertIn("duplicate key", completed.stderr)
 
 
+class ReleasePackageCheckTests(unittest.TestCase):
+    def make_repo(self, directory: str) -> Path:
+        root = Path(directory)
+        files = {
+            "README.md": "# readme\n",
+            "requirements.txt": "numpy\n",
+            "src/prepare.py": "print('ok')\n",
+            "src/train.py": "print('ok')\n",
+            "src/evaluate.py": "print('ok')\n",
+            "src/plot.py": "print('ok')\n",
+            "configs/train.json": "{}",
+            "checkpoints/model.pt": "weights",
+            "results/summary.csv": "a,b\n1,2\n",
+        }
+        for rel, content in files.items():
+            path = root / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        return root
+
+    def manifest(self) -> dict[str, object]:
+        return {
+            "schema_version": "1.0",
+            "repository": ".",
+            "documentation": ["README.md"],
+            "install": {
+                "command": "pip install -r requirements.txt",
+                "environment_files": ["requirements.txt"],
+            },
+            "data_preparation": {"command": "python src/prepare.py", "entry": "src/prepare.py"},
+            "training": {"command": "python src/train.py", "entry": "src/train.py"},
+            "evaluation": {"command": "python src/evaluate.py", "entry": "src/evaluate.py"},
+            "result_generation": {"command": "python src/plot.py", "entry": "src/plot.py"},
+            "default_configs": ["configs/train.json"],
+            "checkpoints": {"acquisition": "download", "paths": ["checkpoints/model.pt"]},
+            "expected_outputs": ["results/summary.csv"],
+            "license": "MIT",
+            "data_restrictions": "",
+        }
+
+    def write_and_run(self, root: Path, manifest: dict[str, object]) -> subprocess.CompletedProcess[str]:
+        path = root / "release-manifest.json"
+        path.write_text(json.dumps(manifest), encoding="utf-8")
+        return run_script("check_release_package.py", path, "--repo-root", root)
+
+    def test_existing_assets_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            completed = self.write_and_run(root, self.manifest())
+        self.assertEqual(completed.returncode, 0, completed.stderr or completed.stdout)
+        report = json.loads(completed.stdout)
+        self.assertEqual(report["status"], "PASS")
+        self.assertEqual(report["findings"], [])
+
+    def test_missing_asset_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            manifest = self.manifest()
+            manifest["expected_outputs"] = ["results/missing.csv"]  # type: ignore[index]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("MISSING_RELEASE_ASSET", categories)
+
+    def test_unsafe_path_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            manifest = self.manifest()
+            manifest["documentation"] = ["../README.md"]  # type: ignore[index]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("UNSAFE_PATH", categories)
+
+    def test_sensitive_filename_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            (root / ".env").write_text("TOKEN=secret\n", encoding="utf-8")
+            manifest = self.manifest()
+            manifest["documentation"] = [".env"]  # type: ignore[index]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("SENSITIVE_CONTENT_RISK", categories)
+
+    def test_invalid_json_config_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            (root / "configs" / "bad.json").write_text("{not valid json", encoding="utf-8")
+            manifest = self.manifest()
+            manifest["default_configs"] = ["configs/bad.json"]  # type: ignore[index]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("INVALID_CONFIG", categories)
+
+
 if __name__ == "__main__":
     unittest.main()

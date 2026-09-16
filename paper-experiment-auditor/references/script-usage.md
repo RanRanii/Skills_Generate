@@ -1,6 +1,6 @@
-# v0.3 确定性工具使用说明
+# v1.0 确定性工具使用说明
 
-六个工具均使用 Python 3，默认将 UTF-8 JSON 写到标准输出。只有需要保存审计附件时才使用 `--output`。脚本提供机械证据，不代替学术判断；输出必须与论文声明和调用路径结合后才能形成判定。
+七个工具均使用 Python 3，默认将 UTF-8 JSON 写到标准输出。只有需要保存审计附件时才使用 `--output`。脚本提供机械证据，不代替学术判断；输出必须与论文声明和调用路径结合后才能形成判定。
 
 ## 仓库结构归集
 
@@ -43,7 +43,8 @@ python scripts/compare_result_tables.py paper-values.csv reproduced-values.csv `
 | `collect_repo_structure.py` | 成功 | 未使用 | 输入或执行错误 |
 | `collect_config_values.py` | 成功 | 未使用 | 输入、格式或执行错误 |
 | `compare_result_tables.py` | 表格匹配 | 存在差异 | 输入、格式或执行错误 |
-| `validate_audit_output.py` | 有效且无警告 | 有效但有警告 | 输入或结构无效 |
+| `validate_audit_output.py` | 有效且无警告 | 有效但有警告（含 `0.3` 兼容性警告） | 输入或结构无效 |
+| `check_release_package.py` | 发布包通过 | 存在检查失败 | 输入或清单格式无效 |
 | `validate_eval_fixtures.py` | 全部案例有效 | 未使用 | 案例或输入无效 |
 | `grade_audit_case.py` | 评分通过 | 评分失败 | 输入或结构无效 |
 
@@ -53,9 +54,20 @@ python scripts/compare_result_tables.py paper-values.csv reproduced-values.csv `
 
 ```powershell
 python scripts/validate_audit_output.py audit-summary.json --format markdown
+python scripts/validate_audit_output.py audit-summary.json --repo-root <repo-root>
 ```
 
-校验 schema 版本、ID 唯一性、跨引用、相对证据路径、`VERIFIED` 的运行证据门槛、覆盖率和发布准备度警告。字段定义见 `references/audit-output-schema.md`。
+校验 `1.0` 契约（向后兼容 `0.3`）：schema 版本、ID 唯一性与双向跨引用、相对证据路径、声明类型与关键性、证据强度与来源、`VERIFIED` 的运行证据门槛、结构化发布决定和适用边界。提供 `--repo-root` 时还会核验每个非 `RUNTIME` 证据的 `path` 与运行时 `artifact` 是否真实存在于仓库内。字段定义见 `references/audit-output-schema.md`，finding 类别见 `references/finding-taxonomy.md`。
+
+`0.3` 输出仍会被接受，但返回兼容性警告（退出码 `1`）。
+
+## 发布包检查
+
+```powershell
+python scripts/check_release_package.py release-manifest.json --repo-root <repo-root> --format markdown
+```
+
+核验 `release-manifest.json` 声明的文档、安装环境文件、入口、默认配置、checkpoint 与预期产物是否作为安全的相对路径存在于仓库内。不执行目标仓库代码，也不替代完整密钥扫描或安全审计。发现项映射到 `MISSING_RELEASE_ASSET`、`SENSITIVE_CONTENT_RISK`、`PRIVATE_DEPENDENCY`、`UNSAFE_PATH`、`INVALID_CONFIG`。清单规范见 `references/release-manifest-schema.md`。
 
 ## 行为评测工具
 
@@ -72,4 +84,4 @@ python scripts/grade_audit_case.py evals/cases/02-config-override audit-summary.
 python -m unittest discover -s tests -v
 ```
 
-在 Skill 根目录运行。测试覆盖仓库归集、配置展开、结果比较、结构化输出约束、9 个 fixture 以及评分器的通过和阻断路径。
+在 Skill 根目录运行。测试覆盖仓库归集、配置展开、结果比较、结构化输出约束、发布包检查、9 个 fixture 以及评分器的通过和阻断路径。
