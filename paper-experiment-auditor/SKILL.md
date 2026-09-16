@@ -39,6 +39,16 @@ metadata:
 6. 如获授权，执行最小成本的动态验证，并记录命令、环境、输入、输出和退出状态。
 7. 使用固定模板生成报告，区分事实、推断、限制和建议。
 
+## 确定性工具
+
+当任务需要稳定、重复的机械归集或比较时，读取 [references/script-usage.md](references/script-usage.md)，并优先复用：
+
+- `scripts/collect_repo_structure.py`：生成仓库清单、类型统计和敏感文件名提醒。
+- `scripts/collect_config_values.py`：展开 JSON、TOML、INI/CFG 配置；安装 PyYAML 时也支持 YAML。
+- `scripts/compare_result_tables.py`：按行键和预先声明的数值容差比较 CSV、TSV 或 JSON 结果表。
+
+脚本输出属于辅助证据。仓库清单不替代代码调用链分析；配置归集不证明某个值实际生效；表格相等不证明训练过程与论文一致。
+
 ## 判定词表
 
 - `VERIFIED`：有足够的实际执行或可重复产物证据，且与论文声明一致。
@@ -60,4 +70,3 @@ metadata:
 - 总体审计报告：采用 [templates/audit-report.md](templates/audit-report.md)。
 
 报告必须说明核验覆盖率、阻断性缺口和“可以随论文公开”结论的适用边界。若没有足够证据，不得给出无条件发布通过结论。
-
