@@ -190,6 +190,51 @@ class AuditOutputValidationTests(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertTrue(any("not referenced by any claim" in item for item in result["errors"]))
 
+    def test_v1_contract_fields_are_required(self) -> None:
+        for field in ("claim_type", "criticality", "source_locator"):
+            with self.subTest(field=field):
+                report = copy.deepcopy(valid_report())
+                report["claims"][0].pop(field)  # type: ignore[index]
+                result = validate_report(report)
+                self.assertFalse(result["valid"])
+                self.assertTrue(any(field in item for item in result["errors"]))
+
+        for field in ("strength", "generated_by"):
+            with self.subTest(field=field):
+                report = copy.deepcopy(valid_report())
+                report["evidence"][0].pop(field)  # type: ignore[index]
+                result = validate_report(report)
+                self.assertFalse(result["valid"])
+                self.assertTrue(any(field in item and "required" in item for item in result["errors"]))
+
+    def test_noncanonical_category_is_invalid(self) -> None:
+        report = valid_report()
+        report["findings"][0]["category"] = "METRIC_AVERAGING_MISMATCH"  # type: ignore[index]
+        result = validate_report(report)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("finding-taxonomy.json" in item for item in result["errors"]))
+
+    def test_subject_local_absolute_path_is_invalid(self) -> None:
+        report = valid_report()
+        report["subject"]["repository"] = "D:/private/repository"  # type: ignore[index]
+        result = validate_report(report)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("subject.repository" in item for item in result["errors"]))
+
+    def test_claim_finding_references_must_be_reciprocal(self) -> None:
+        report = valid_report()
+        report["findings"][0]["claim_ids"] = ["CLM-002"]  # type: ignore[index]
+        result = validate_report(report)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("does not reference the claim" in item for item in result["errors"]))
+
+    def test_release_decision_must_list_open_major_findings(self) -> None:
+        report = valid_report()
+        report["release_decision"]["blocking_finding_ids"] = []  # type: ignore[index]
+        result = validate_report(report)
+        self.assertFalse(result["valid"])
+        self.assertTrue(any("omits open BLOCKER/MAJOR" in item for item in result["errors"]))
+
     def test_markdown_uses_none_only_for_empty_sections(self) -> None:
         clean = markdown_report({"valid": True, "errors": [], "warnings": []})
         self.assertEqual(clean.count("- None"), 2)

@@ -23,7 +23,16 @@ def parse_args() -> argparse.Namespace:
 
 def evidence_path_exists(case_dir: Path, item: dict[str, Any]) -> bool:
     if item.get("type") == "RUNTIME":
-        return True
+        artifact = item.get("artifact")
+        if artifact is None:
+            return bool(item.get("command")) and isinstance(item.get("exit_status"), int)
+        relative = Path(str(artifact).replace("\\", "/"))
+        if relative.is_absolute() or ".." in relative.parts:
+            return False
+        candidates = [case_dir / relative]
+        if relative.parts and relative.parts[0] != "repository":
+            candidates.append(case_dir / "repository" / relative)
+        return any(path.is_file() for path in candidates)
     relative = Path(str(item.get("path", "")).replace("\\", "/"))
     candidates = [case_dir / relative]
     if relative.parts and relative.parts[0] != "repository":
@@ -59,6 +68,9 @@ def finding_match_score(
 
 
 def grade_case(case_dir: Path, report: dict[str, Any]) -> dict[str, Any]:
+    # Keep structural validation separate from fixture path existence so a
+    # hallucinated artifact is scored as a behavioral failure, not malformed
+    # JSON. The grader reports the path failure explicitly below.
     validation = validate_report(report)
     if not validation["valid"]:
         return {

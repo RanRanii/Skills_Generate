@@ -45,6 +45,8 @@ LOCAL_PATH_HINTS = (
     "internal",
 )
 CONFIG_SUFFIXES = {".json", ".toml", ".ini", ".cfg"}
+EXTERNAL_CHECKPOINT_HINTS = ("download", "external", "http://", "https://", "zenodo", "huggingface")
+IGNORED_SCAN_DIRS = {".git", ".hg", ".svn", "__pycache__", ".pytest_cache", ".mypy_cache", ".venv", "venv", "node_modules"}
 
 ENTRY_FIELDS = ("data_preparation", "training", "evaluation", "result_generation")
 
@@ -73,6 +75,19 @@ def safe_relative(value: Any) -> bool:
     if len(normalized) >= 2 and normalized[1] == ":":
         return False
     return ".." not in PurePosixPath(normalized).parts
+
+
+def nonempty_string(value: Any) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def command_has_local_path(command: Any) -> bool:
+    if not nonempty_string(command):
+        return False
+    text = str(command).replace("\\", "/")
+    if any(hint in text for hint in ("/home/", "/Users/", "/tmp/", "C:/", "D:/", "file://")):
+        return True
+    return bool(len(text) >= 2 and text[1] == ":")
 
 
 def matches_any(name: str, patterns: tuple[str, ...]) -> bool:
@@ -109,8 +124,6 @@ def parse_config(path: Path) -> str | None:
 
 def find_symlink_escape(repo_root: Path, relative: str) -> bool:
     path = repo_root / relative
-    if not path.is_symlink():
-        return False
     try:
         resolved = path.resolve()
     except OSError:
@@ -168,6 +181,66 @@ def collect_declared_paths(manifest: dict[str, Any], repo_root: Path, errors: li
     return declared
 
 
+def validate_manifest_contract(manifest: dict[str, Any], errors: list[str], findings: list[dict[str, str]]) -> None:
+    """Validate non-path fields that determine whether a release is usable."""
+    if not safe_relative(manifest.get("repository")):
+        findings.append({"category": "UNSAFE_PATH", "field": "repository", "path": str(manifest.get("repository")), "message": "repository must be a safe relative path"})
+    if not isinstance(manifest.get("documentation"), list):
+        errors.append("documentation must be an array")
+    install = manifest.get("install")
+    if not isinstance(install, dict):
+        errors.append("install must be an object")
+    else:
+        if not nonempty_string(install.get("command")):
+            errors.append("install.command must be a non-empty string")
+        elif command_has_local_path(install["command"]):
+            findings.append({"category": "UNSAFE_PATH", "field": "install.command", "path": str(install["command"]), "message": "command contains a local absolute path"})
+        if not isinstance(install.get("environment_files"), list):
+            errors.append("install.environment_files must be an array")
+    for field in ENTRY_FIELDS:
+        entry = manifest.get(field)
+        if not isinstance(entry, dict):
+            errors.append(f"{field} must be an object")
+            continue
+        if not nonempty_string(entry.get("command")):
+            errors.append(f"{field}.command must be a non-empty string")
+        elif command_has_local_path(entry["command"]):
+            findings.append({"category": "UNSAFE_PATH", "field": f"{field}.command", "path": str(entry["command"]), "message": "command contains a local absolute path"})
+        if not safe_relative(entry.get("entry")):
+            findings.append({"category": "UNSAFE_PATH", "field": f"{field}.entry", "path": str(entry.get("entry")), "message": "entry must be a safe relative path"})
+    if not isinstance(manifest.get("default_configs"), list):
+        errors.append("default_configs must be an array")
+    checkpoints = manifest.get("checkpoints")
+    if not isinstance(checkpoints, dict):
+        errors.append("checkpoints must be an object")
+    else:
+        acquisition = checkpoints.get("acquisition")
+        if not isinstance(acquisition, str):
+            errors.append("checkpoints.acquisition must be a string (use an empty string when not applicable)")
+        paths = checkpoints.get("paths")
+        if not isinstance(paths, list):
+            errors.append("checkpoints.paths must be an array")
+        elif isinstance(acquisition, str) and any(hint in acquisition.lower() for hint in EXTERNAL_CHECKPOINT_HINTS) and paths:
+            findings.append({"category": "INVALID_CONFIG", "field": "checkpoints", "path": "", "message": "externally acquired checkpoints must not also be listed in checkpoints.paths"})
+    if not isinstance(manifest.get("expected_outputs"), list):
+        errors.append("expected_outputs must be an array")
+    if not nonempty_string(manifest.get("license")):
+        errors.append("license must be a non-empty identifier (use UNLICENSED for personal code)")
+    if not isinstance(manifest.get("data_restrictions"), str):
+        errors.append("data_restrictions must be a string")
+
+
+def scan_sensitive_filenames(repo_root: Path, findings: list[dict[str, str]]) -> None:
+    for path in repo_root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative_parts = path.relative_to(repo_root).parts
+        if any(part in IGNORED_SCAN_DIRS for part in relative_parts):
+            continue
+        if matches_any(path.name, SENSITIVE_PATTERNS):
+            findings.append({"category": "SENSITIVE_CONTENT_RISK", "field": "repository_scan", "path": path.relative_to(repo_root).as_posix(), "message": "sensitive-looking filename found anywhere in repository"})
+
+
 def check_manifest(manifest: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     errors: list[str] = []
     findings: list[dict[str, str]] = []
@@ -181,6 +254,9 @@ def check_manifest(manifest: dict[str, Any], repo_root: Path) -> dict[str, Any]:
     if not repo_root.is_dir():
         return {"valid": False, "errors": [f"repository root is not a directory: {repo_root}"]}
 
+    validate_manifest_contract(manifest, errors, findings)
+    scan_sensitive_filenames(repo_root, findings)
+
     for field, path, is_config in collect_declared_paths(manifest, repo_root, errors):
         if not safe_relative(path):
             findings.append({"category": "UNSAFE_PATH", "field": field, "path": str(path), "message": "not a safe relative path"})
@@ -193,13 +269,13 @@ def check_manifest(manifest: dict[str, Any], repo_root: Path) -> dict[str, Any]:
             findings.append({"category": "PRIVATE_DEPENDENCY", "field": field, "path": normalized, "message": "local or private path hint"})
 
         target = repo_root / normalized
+        if find_symlink_escape(repo_root, normalized):
+            findings.append({"category": "UNSAFE_PATH", "field": field, "path": normalized, "message": "path or parent directory resolves outside repository"})
+            checks.append({"field": field, "path": normalized, "status": "external-symlink"})
+            continue
         if not target.is_file():
             findings.append({"category": "MISSING_RELEASE_ASSET", "field": field, "path": normalized, "message": "declared path does not exist"})
             checks.append({"field": field, "path": normalized, "status": "missing"})
-            continue
-        if find_symlink_escape(repo_root, normalized):
-            findings.append({"category": "UNSAFE_PATH", "field": field, "path": normalized, "message": "symlink resolves outside repository"})
-            checks.append({"field": field, "path": normalized, "status": "external-symlink"})
             continue
         checks.append({"field": field, "path": normalized, "status": "ok"})
 

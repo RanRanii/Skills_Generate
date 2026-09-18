@@ -31,15 +31,13 @@
     "configs/eval.json"
   ],
   "checkpoints": {
-    "acquisition": "download from https://zenodo.org/record/<id>",
-    "paths": [
-      "checkpoints/model.pt"
-    ]
+    "acquisition": "bundled",
+    "paths": ["checkpoints/model.pt"]
   },
   "expected_outputs": [
     "results/summary.csv",
     "figures/fig1.png"
   ],
-  "license": "MIT",
+  "license": "UNLICENSED",
   "data_restrictions": "training data is not redistributed; obtain it via src/prepare_data.py"
 }

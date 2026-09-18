@@ -40,7 +40,7 @@
 
 - `claim_type`：`DATA`、`METHOD`、`TRAINING`、`METRIC`、`RESULT`、`RELEASE`。
 - `criticality`：`CORE`、`SUPPORTING`、`OPERATIONAL`。`CORE` 直接影响论文核心结论。
-- `source_locator`：论文章节、表格、公式或图注，用于回源定位。
+- `source_locator`：论文章节、表格、公式或图注，用于回源定位；V1 中所有 claim 都必须填写。
 
 `status` 只能使用六种判定：`VERIFIED`、`CONSISTENT`、`MISMATCH`、`UNVERIFIABLE`、`AMBIGUOUS`、`NOT_APPLICABLE`。
 
@@ -62,8 +62,8 @@
 ```
 
 - `type`：`PAPER`、`CODE`、`CONFIG`、`ARTIFACT`、`RUNTIME`、`DOC`。
-- `strength`：`DIRECT`、`INDIRECT`、`SUPPORTING`。
-- `generated_by`：`HUMAN`（人工检查）、`SCRIPT`（确定性脚本）、`COMMAND`（运行命令）。
+- `strength`：`DIRECT`、`INDIRECT`、`SUPPORTING`，V1 必填。
+- `generated_by`：`HUMAN`（人工检查）、`SCRIPT`（确定性脚本）、`COMMAND`（运行命令），V1 必填。
 - `digest`：可选，关键产物的 SHA-256，格式为 `sha256:<64 位十六进制>`。
 - `path`：非 `RUNTIME` 证据必填；必须是安全的相对路径，不得包含本机绝对路径或 `..`。
 
@@ -79,7 +79,7 @@
 }
 ```
 
-`command`、`commit`、`exit_status`、`artifact` 均为必填，`artifact` 必须是安全的相对路径。
+`command`、`commit`、`exit_status`、`artifact` 均为必填；没有文件产物时使用 `"artifact": null`。非空 artifact 必须是安全的相对路径。
 
 ## Finding
 
@@ -99,10 +99,11 @@
 }
 ```
 
-- `category`：使用 [finding-taxonomy.md](finding-taxonomy.md) 中的规范类别，`UPPER_SNAKE_CASE`。
+- `category`：使用 [finding-taxonomy.json](finding-taxonomy.json) 中的规范类别；[finding-taxonomy.md](finding-taxonomy.md) 负责解释边界。
 - `severity`：`BLOCKER`、`MAJOR`、`MODERATE`、`MINOR`、`INFO`。
-- `disposition`：`OPEN`、`FIXED`、`ACCEPTED_RISK`、`WAIVED`。默认 `OPEN`。
-- `resolution_evidence_ids`：可选，`FIXED` 时引用证明已修复的证据。
+- `disposition`：`OPEN`、`FIXED`、`ACCEPTED_RISK`、`WAIVED`，V1 必填。
+- `resolution_evidence_ids`：V1 必须是数组；`FIXED` 时应引用证明已修复的证据。
+- `recommendation`：V1 必填，即使建议是“保留现状并说明限制”。
 
 ## Coverage
 
@@ -135,12 +136,14 @@
 - 不存在 `CORE` 且 `status` 为 `MISMATCH` 或 `UNVERIFIABLE` 的 claim。
 - 没有虚构证据路径（由 `--repo-root` 校验）。
 - `VERIFIED` 声明具有合格的运行证据。
+- 所有开放的 `BLOCKER`/`MAJOR` finding 都已列入 `blocking_finding_ids`；blocking 与 conditional 列表不得重叠。
 
 ## 一致性要求
 
-- 所有 ID 唯一，所有引用必须存在且双向成立（每个 finding 至少被一个 claim 引用）。
+- 所有 ID 唯一，所有引用必须存在且双向成立：claim 与 finding 互相列出对方，每个 finding 至少被一个 claim 引用。
 - Markdown 报告与 JSON 中的状态、严重性、数量和 ID 必须一致。
-- 不得写入凭据、个人数据、本机绝对路径或无法验证的运行事实。
+- `subject.manuscript` 和 `subject.repository` 必须是相对引用或公开 URL，不得写入本机绝对路径。
+- 不得写入凭据、个人数据或无法验证的运行事实。
 
 ## 校验
 

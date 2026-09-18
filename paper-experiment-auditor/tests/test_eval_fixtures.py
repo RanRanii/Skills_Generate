@@ -122,6 +122,29 @@ class EvaluationFixtureTests(unittest.TestCase):
         self.assertEqual(result["status"], "FAIL")
         self.assertIn("EVD-002", result["hallucinated_evidence"])
 
+    def test_hallucinated_runtime_artifact_blocks_case(self) -> None:
+        report = copy.deepcopy(config_override_report())
+        report["evidence"][0] = {  # type: ignore[index]
+            "evidence_id": "EVD-001",
+            "type": "RUNTIME",
+            "strength": "DIRECT",
+            "generated_by": "COMMAND",
+            "command": "python src/run.py",
+            "commit": "fixture",
+            "exit_status": 0,
+            "artifact": "results/missing.csv",
+            "observation": "The command completed.",
+        }
+        report["claims"][0]["status"] = "VERIFIED"  # type: ignore[index]
+        with tempfile.TemporaryDirectory() as directory:
+            audit = Path(directory) / "audit-summary.json"
+            audit.write_text(json.dumps(report), encoding="utf-8")
+            completed = run_script("grade_audit_case.py", CASES / "02-config-override", audit)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["status"], "FAIL")
+        self.assertIn("EVD-001", result["hallucinated_evidence"])
+
 
 if __name__ == "__main__":
     unittest.main()

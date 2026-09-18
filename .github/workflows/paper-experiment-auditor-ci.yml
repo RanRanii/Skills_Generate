@@ -1,0 +1,35 @@
+name: paper-experiment-auditor
+
+on:
+  push:
+    paths:
+      - "paper-experiment-auditor/**"
+      - ".github/workflows/paper-experiment-auditor-ci.yml"
+  pull_request:
+    paths:
+      - "paper-experiment-auditor/**"
+      - ".github/workflows/paper-experiment-auditor-ci.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic-checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run unit tests
+        run: python -B -m unittest discover -s paper-experiment-auditor/tests -v
+      - name: Validate evaluation fixtures
+        run: python -B paper-experiment-auditor/scripts/validate_eval_fixtures.py paper-experiment-auditor/evals/cases
+      - name: Validate audit summary template
+        run: python -B paper-experiment-auditor/scripts/validate_audit_output.py paper-experiment-auditor/templates/audit-summary.json
+      - name: Parse release manifest and taxonomy templates
+        run: >-
+          python -c "import json; json.load(open('paper-experiment-auditor/templates/release-manifest.json', encoding='utf-8')); json.load(open('paper-experiment-auditor/references/finding-taxonomy.json', encoding='utf-8'))"

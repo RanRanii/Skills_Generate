@@ -37,6 +37,7 @@
 - 使用 `templates/claim-code-matrix.md` 和 `templates/audit-report.md`。
 - 为证据分配 `EVD-###`，并让 claim 与 finding 只引用已定义的证据 ID。
 - 用户需要机器可读交付物、自动评分或后续自动化时，读取 `references/audit-output-schema.md`，优先使用其中的规范 finding category，生成 `audit-summary.json`，并运行 `scripts/validate_audit_output.py`。
+- V1 输出必须填写 `claim_type`、`criticality`、`source_locator`、证据 `strength`/`generated_by`、finding `disposition`/`recommendation`；claim 与 finding 的引用必须双向一致。
 
 ## 完成条件
 

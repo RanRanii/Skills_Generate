@@ -1,6 +1,6 @@
 # Finding 分类规范
 
-本文件是 finding `category` 的单一来源。找不到适用的规范类别时才创建新的精确类别，并在 Markdown 报告中解释其边界。不要为同一问题堆叠 `_MISMATCH`、`_ERROR` 等近义后缀。
+`finding-taxonomy.json` 是机器校验使用的唯一分类来源；本文件解释分类边界。找不到适用的规范类别时才创建新的精确类别，并同步更新 JSON 与本文件。不要为同一问题堆叠 `_MISMATCH`、`_ERROR` 等近义后缀。
 
 ## 规范类别
 
@@ -20,6 +20,8 @@
 | `MISSING_RELEASE_ASSET` | 公开仓库缺少安装、依赖、入口或必要说明文件 | missing README, missing entry point | BLOCKER–MAJOR | 是 |
 | `PRIVATE_DEPENDENCY` | 依赖未公开的私有代码、数据或包，公开后无法运行 | internal dependency, closed dependency | BLOCKER | 是 |
 | `SENSITIVE_CONTENT_RISK` | 仓库可能包含凭据、个人数据或受限材料 | credential leak, secret exposure | BLOCKER | 是 |
+| `UNSAFE_PATH` | 路径包含本机绝对路径、路径逃逸或仓库外符号链接 | path traversal, symlink escape | BLOCKER–MAJOR | 是 |
+| `INVALID_CONFIG` | 默认配置或发布清单结构不可解析或自相矛盾 | malformed config, manifest contradiction | MAJOR–MODERATE | 是（影响入口时） |
 | `MANUSCRIPT_AMBIGUITY` | 稿件本身存在多个合理解释，无法确定唯一核验目标 | paper ambiguity, underspecified claim | MODERATE–MINOR | 否 |
 
 ## 归并示例

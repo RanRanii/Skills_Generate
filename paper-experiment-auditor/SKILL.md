@@ -27,6 +27,7 @@ metadata:
 - 用户要求运行、复现或验证结果：完成静态审计后，再读取 [workflows/05-reproduction-validation.md](workflows/05-reproduction-validation.md)。
 - 用户明确要求依据报告修复：读取 [workflows/06-remediation.md](workflows/06-remediation.md)，修复后重新核验受影响声明。
 - 用户要求评估或发布本 Skill 新版本：读取 [workflows/07-evaluation-and-release-gate.md](workflows/07-evaluation-and-release-gate.md)。评测 oracle 只能在核验输出完成后用于评分。
+- 用户准备将论文附带代码上传 GitHub、检查公开发布包或要求 release review：读取 [workflows/08-publication-release-review.md](workflows/08-publication-release-review.md)。
 
 不要默认读取所有参考文件。工作流会说明当前阶段需要读取哪些规则。
 
@@ -73,7 +74,7 @@ metadata:
 - Claim–Code Matrix：采用 [templates/claim-code-matrix.md](templates/claim-code-matrix.md)。
 - 复现记录：采用 [templates/reproduction-log.md](templates/reproduction-log.md)。
 - 总体审计报告：采用 [templates/audit-report.md](templates/audit-report.md)。
-- 机器可读摘要：需要评测、自动化或下游消费时，读取 [references/audit-output-schema.md](references/audit-output-schema.md)，并采用 [templates/audit-summary.json](templates/audit-summary.json)。finding 的规范类别见 [references/finding-taxonomy.md](references/finding-taxonomy.md)。
+- 机器可读摘要：需要评测、自动化或下游消费时，读取 [references/audit-output-schema.md](references/audit-output-schema.md)，并采用 [templates/audit-summary.json](templates/audit-summary.json)。finding 的机器可读分类见 [references/finding-taxonomy.json](references/finding-taxonomy.json)，边界说明见 [references/finding-taxonomy.md](references/finding-taxonomy.md)。
 - 发布清单：进行发布完整性检查时，采用 [templates/release-manifest.json](templates/release-manifest.json)，规范见 [references/release-manifest-schema.md](references/release-manifest-schema.md)。
 
 报告必须说明核验覆盖率、阻断性缺口和“可以随论文公开”结论的适用边界。Markdown 与 JSON 中的 ID、状态、严重性和数量必须一致。若没有足够证据，不得给出无条件发布通过结论。

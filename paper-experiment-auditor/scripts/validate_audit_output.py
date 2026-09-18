@@ -36,6 +36,21 @@ ID_PATTERNS = {
 CATEGORY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-fA-F]{64}$")
 WINDOWS_ABSOLUTE = re.compile(r"^[A-Za-z]:[\\/]")
+TAXONOMY_PATH = Path(__file__).resolve().parents[1] / "references" / "finding-taxonomy.json"
+
+
+def load_taxonomy() -> set[str]:
+    try:
+        data = json.loads(TAXONOMY_PATH.read_text(encoding="utf-8"))
+        categories = data.get("categories", [])
+        if isinstance(categories, list) and all(isinstance(item, str) for item in categories):
+            return set(categories)
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    return set()
+
+
+FINDING_CATEGORIES = load_taxonomy()
 
 
 def parse_args() -> argparse.Namespace:
@@ -66,16 +81,41 @@ def relative_evidence_path(value: Any) -> bool:
     return ".." not in PurePosixPath(text).parts
 
 
+def safe_subject_reference(value: Any) -> bool:
+    """Accept a repository-relative reference or public URL, never a local path."""
+    if not nonempty_string(value):
+        return False
+    text = str(value).strip().replace("\\", "/")
+    if text.startswith(("file://", "//")) or WINDOWS_ABSOLUTE.match(text):
+        return False
+    if text.startswith(("/home/", "/Users/", "/user/", "/tmp/", "/private/")):
+        return False
+    if text.startswith(("http://", "https://")):
+        return True
+    return ".." not in PurePosixPath(text).parts and not text.startswith("/")
+
+
 def add_required_string_errors(item: dict[str, Any], fields: tuple[str, ...], prefix: str, errors: list[str]) -> None:
     for field in fields:
         if not nonempty_string(item.get(field)):
             errors.append(f"{prefix}.{field} must be a non-empty string")
 
 
-def enum_field(item: dict[str, Any], field: str, allowed: set[str], prefix: str, errors: list[str]) -> None:
-    """Validate an optional enum field when it is present."""
+def enum_field(
+    item: dict[str, Any],
+    field: str,
+    allowed: set[str],
+    prefix: str,
+    errors: list[str],
+    *,
+    required: bool = False,
+) -> None:
+    """Validate an enum field, optionally requiring it for the v1 contract."""
     value = item.get(field)
-    if value is not None and value not in allowed:
+    if value is None:
+        if required:
+            errors.append(f"{prefix}.{field} is required")
+    elif value not in allowed:
         errors.append(f"{prefix}.{field} must be one of {sorted(allowed)}")
 
 
@@ -137,6 +177,10 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
         errors.append(f"{subject_label} must be an object")
     else:
         add_required_string_errors(subject, ("manuscript", "repository", "commit"), subject_label, errors)
+        if is_v1:
+            for field in ("manuscript", "repository"):
+                if not safe_subject_reference(subject.get(field)):
+                    errors.append(f"{subject_label}.{field} must be a safe relative reference or public URL")
 
     if is_v1:
         profile = data.get("audit_profile")
@@ -155,14 +199,16 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
             continue
         add_required_string_errors(item, ("observation",), prefix, errors)
         if is_v1:
-            enum_field(item, "strength", EVIDENCE_STRENGTHS, prefix, errors)
-            enum_field(item, "generated_by", GENERATED_BY, prefix, errors)
+            enum_field(item, "strength", EVIDENCE_STRENGTHS, prefix, errors, required=True)
+            enum_field(item, "generated_by", GENERATED_BY, prefix, errors, required=True)
             digest = item.get("digest")
             if digest is not None and (not isinstance(digest, str) or not DIGEST_PATTERN.fullmatch(digest)):
                 errors.append(f"{prefix}.digest must be a sha256:<64-hex> string")
         if evidence_type == "RUNTIME":
             if is_v1:
-                add_required_string_errors(item, ("command", "commit", "artifact"), prefix, errors)
+                add_required_string_errors(item, ("command", "commit"), prefix, errors)
+                if "artifact" not in item:
+                    errors.append(f"{prefix}.artifact is required (use null when no file is produced)")
                 exit_status = item.get("exit_status")
                 if not isinstance(exit_status, int) or isinstance(exit_status, bool):
                     errors.append(f"{prefix}.exit_status must be an integer")
@@ -180,13 +226,13 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
         category = item.get("category")
         if not nonempty_string(category) or not CATEGORY_PATTERN.fullmatch(str(category)):
             errors.append(f"{prefix}.category must use UPPER_SNAKE_CASE")
+        elif is_v1 and str(category) not in FINDING_CATEGORIES:
+            errors.append(f"{prefix}.category is not in finding-taxonomy.json: {category}")
         if item.get("severity") not in SEVERITIES:
             errors.append(f"{prefix}.severity must be one of {sorted(SEVERITIES)}")
         if is_v1:
-            enum_field(item, "disposition", DISPOSITIONS, prefix, errors)
-            recommendation = item.get("recommendation")
-            if recommendation is not None and not nonempty_string(recommendation):
-                errors.append(f"{prefix}.recommendation must be a non-empty string")
+            enum_field(item, "disposition", DISPOSITIONS, prefix, errors, required=True)
+            add_required_string_errors(item, ("recommendation",), prefix, errors)
             resolution_ids = string_list(item.get("resolution_evidence_ids"), f"{prefix}.resolution_evidence_ids", errors)
             for identifier in resolution_ids:
                 if identifier not in evidence_index:
@@ -211,11 +257,9 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
         prefix = f"claims[{index}]"
         add_required_string_errors(item, ("statement",), prefix, errors)
         if is_v1:
-            enum_field(item, "claim_type", CLAIM_TYPES, prefix, errors)
-            enum_field(item, "criticality", CRITICALITIES, prefix, errors)
-            source_locator = item.get("source_locator")
-            if source_locator is not None and not nonempty_string(source_locator):
-                errors.append(f"{prefix}.source_locator must be a non-empty string")
+            enum_field(item, "claim_type", CLAIM_TYPES, prefix, errors, required=True)
+            enum_field(item, "criticality", CRITICALITIES, prefix, errors, required=True)
+            add_required_string_errors(item, ("source_locator",), prefix, errors)
         status = item.get("status")
         if status not in CLAIM_STATUSES:
             errors.append(f"{prefix}.status must be one of {sorted(CLAIM_STATUSES)}")
@@ -249,6 +293,20 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
     if orphan_findings:
         errors.append(f"findings not referenced by any claim: {', '.join(orphan_findings)}")
 
+    if is_v1:
+        for claim in claims:
+            claim_id = claim.get("claim_id")
+            for finding_id in claim.get("finding_ids", []):
+                finding = finding_index.get(finding_id)
+                if finding and claim_id not in finding.get("claim_ids", []):
+                    errors.append(f"claim {claim_id} references {finding_id}, but finding does not reference the claim")
+        for finding in findings:
+            finding_id = finding.get("finding_id")
+            for claim_id in finding.get("claim_ids", []):
+                claim = claim_index.get(claim_id)
+                if claim and finding_id not in claim.get("finding_ids", []):
+                    errors.append(f"finding {finding_id} references {claim_id}, but claim does not reference the finding")
+
     coverage = data.get("coverage")
     if not isinstance(coverage, dict):
         errors.append("coverage must be an object")
@@ -280,6 +338,19 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
                 for identifier in ids:
                     if identifier not in finding_index:
                         errors.append(f"release_decision.{field} references unknown finding: {identifier}")
+            blocking_ids = set(decision.get("blocking_finding_ids", []))
+            conditional_ids = set(decision.get("conditional_finding_ids", []))
+            overlap = sorted(blocking_ids & conditional_ids)
+            if overlap:
+                errors.append("release_decision blocking and conditional lists overlap: " + ", ".join(overlap))
+            expected_blocking = {
+                item["finding_id"]
+                for item in findings
+                if item.get("severity") in {"BLOCKER", "MAJOR"} and item.get("disposition") == "OPEN"
+            }
+            missing_blocking = sorted(expected_blocking - blocking_ids)
+            if missing_blocking:
+                errors.append("release_decision.blocking_finding_ids omits open BLOCKER/MAJOR findings: " + ", ".join(missing_blocking))
             if status == "READY":
                 if any(
                     item.get("severity") in {"BLOCKER", "MAJOR"} and item.get("disposition", "OPEN") == "OPEN"
@@ -291,6 +362,8 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
                     errors.append("release_decision is READY but CORE claims lack evidence")
                 if any(item.get("status") in {"MISMATCH", "UNVERIFIABLE"} for item in core_claims):
                     errors.append("release_decision is READY but CORE claims are MISMATCH or UNVERIFIABLE")
+            if status == "BLOCKED" and expected_blocking and not blocking_ids:
+                errors.append("release_decision is BLOCKED but blocking_finding_ids is empty")
         limitations = data.get("limitations")
         if limitations is None or not isinstance(limitations, list):
             errors.append("limitations must be an array")
@@ -315,6 +388,8 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
             for index, item in enumerate(evidence):
                 prefix = f"evidence[{index}]"
                 path_value = item.get("artifact") if item.get("type") == "RUNTIME" else item.get("path")
+                if item.get("type") == "RUNTIME" and path_value is None:
+                    continue
                 if not relative_evidence_path(path_value):
                     continue  # already reported as an unsafe/missing path
                 normalized = str(path_value).replace("\\", "/")
@@ -329,7 +404,7 @@ def validate_report(data: Any, repo_root: Path | None = None) -> dict[str, Any]:
     used_evidence = {
         identifier
         for item in claims + findings
-        for identifier in item.get("evidence_ids", [])
+        for identifier in item.get("evidence_ids", []) + item.get("resolution_evidence_ids", [])
         if isinstance(identifier, str)
     }
     unused_evidence = sorted(set(evidence_index) - used_evidence)

@@ -35,19 +35,20 @@
 
 ```text
 claim_id
-category
+claim_type
+criticality
 statement
-paper_location
+source_locator
 expected_behavior
 expected_value
 tolerance_or_equivalence
-importance
 notes
 ```
+
+当需要生成 `audit-summary.json` 时，以上字段分别映射到 `claims[].id`、`claim_type`、`criticality`、`statement` 和 `source_locator`。不要再使用未定义的 `category`、`paper_location` 或自由文本 `importance` 替代 V1 字段。
 
 ## 输出
 
 - 论文实验规格表
 - 待澄清声明列表
 - 需要在代码、配置和结果中寻找的证据列表
-

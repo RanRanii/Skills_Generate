@@ -26,6 +26,21 @@ CATEGORY_PATTERN = re.compile(r"^[A-Z][A-Z0-9_]*$")
 CASE_ID_PATTERN = re.compile(r"^\d{2}-[a-z0-9-]+$")
 SENSITIVE_NAMES = {".env", "id_rsa", "id_ed25519", "credentials.json", "secrets.json"}
 MAX_FIXTURE_BYTES = 1_000_000
+TAXONOMY_PATH = Path(__file__).resolve().parents[1] / "references" / "finding-taxonomy.json"
+
+
+def load_taxonomy() -> set[str]:
+    try:
+        data = json.loads(TAXONOMY_PATH.read_text(encoding="utf-8"))
+        categories = data.get("categories", [])
+        if isinstance(categories, list):
+            return {item for item in categories if isinstance(item, str)}
+    except (OSError, ValueError, json.JSONDecodeError):
+        pass
+    return set()
+
+
+FINDING_CATEGORIES = load_taxonomy()
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,6 +85,8 @@ def validate_required_finding(item: Any, label: str, case_dir: Path, errors: lis
     category = item.get("category")
     if not isinstance(category, str) or not CATEGORY_PATTERN.fullmatch(category):
         errors.append(f"{label}.category must use UPPER_SNAKE_CASE")
+    elif category not in FINDING_CATEGORIES:
+        errors.append(f"{label}.category is not in finding-taxonomy.json: {category}")
     string_list(item.get("allowed_claim_statuses"), f"{label}.allowed_claim_statuses", CLAIM_STATUSES, errors)
     string_list(item.get("allowed_severities"), f"{label}.allowed_severities", SEVERITIES, errors)
     string_list(item.get("required_evidence_types"), f"{label}.required_evidence_types", EVIDENCE_TYPES, errors)
@@ -111,6 +128,8 @@ def validate_case(case_dir: Path) -> tuple[str | None, list[str], list[str]]:
         category = manifest.get("category")
         if not isinstance(category, str) or not CATEGORY_PATTERN.fullmatch(category):
             errors.append("case.json.category must use UPPER_SNAKE_CASE")
+        elif category != "CONTROL" and category not in FINDING_CATEGORIES:
+            errors.append(f"case.json.category is not in finding-taxonomy.json: {category}")
 
     for name in ("request.md", "manuscript.md"):
         path = case_dir / name
@@ -143,6 +162,8 @@ def validate_case(case_dir: Path) -> tuple[str | None, list[str], list[str]]:
         for category in forbidden_categories:
             if not CATEGORY_PATTERN.fullmatch(category):
                 errors.append(f"oracle.forbidden_categories has invalid category: {category}")
+            elif category not in FINDING_CATEGORIES:
+                errors.append(f"oracle.forbidden_categories has unknown category: {category}")
         overlap = sorted(set(categories) & set(forbidden_categories))
         if overlap:
             errors.append(f"required and forbidden categories overlap: {', '.join(overlap)}")

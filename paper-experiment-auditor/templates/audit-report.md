@@ -35,7 +35,9 @@
 
 ### FND-001：发现标题
 
+- 类别：CONFIG_OVERRIDE/METHOD_MISMATCH/…（见 `references/finding-taxonomy.json`）
 - 严重性：BLOCKER/MAJOR/MODERATE/MINOR/INFO
+- 处置：OPEN/FIXED/ACCEPTED_RISK/WAIVED
 - 关联声明：CLM-000
 - 论文期望：
 - 实际实现或结果：
@@ -43,7 +45,7 @@
 - 证据定位：
 - 影响：
 - 建议：
-- 修复验证：未修复/已修复未验证/已验证
+- 修复证据 ID：EVD-000（`FIXED` 时必填）
 
 ## 5. GitHub 发布完整性
 
@@ -78,6 +80,7 @@
 - [ ] 更新 Claim–Code Matrix
 - [ ] 在最终提交上重新执行必要检查
 - [ ] 确认仓库不包含密钥、个人数据或受限材料
+- [ ] 确认没有本机绝对路径或仓库外符号链接
 - [ ] 若生成结构化摘要，运行 `scripts/validate_audit_output.py`
 - [ ] 确认 Markdown 与 JSON 的 ID、状态、严重性和数量一致
 

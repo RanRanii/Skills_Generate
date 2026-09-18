@@ -239,7 +239,7 @@ class ReleasePackageCheckTests(unittest.TestCase):
             "evaluation": {"command": "python src/evaluate.py", "entry": "src/evaluate.py"},
             "result_generation": {"command": "python src/plot.py", "entry": "src/plot.py"},
             "default_configs": ["configs/train.json"],
-            "checkpoints": {"acquisition": "download", "paths": ["checkpoints/model.pt"]},
+            "checkpoints": {"acquisition": "bundled", "paths": ["checkpoints/model.pt"]},
             "expected_outputs": ["results/summary.csv"],
             "license": "MIT",
             "data_restrictions": "",
@@ -289,6 +289,65 @@ class ReleasePackageCheckTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
         categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
         self.assertIn("SENSITIVE_CONTENT_RISK", categories)
+
+    def test_unlisted_sensitive_filename_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            (root / ".env").write_text("TOKEN=secret\n", encoding="utf-8")
+            completed = self.write_and_run(root, self.manifest())
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("SENSITIVE_CONTENT_RISK", categories)
+
+    def test_missing_manifest_contract_fields_are_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            manifest = self.manifest()
+            manifest.pop("license")
+            manifest.pop("data_restrictions")
+            manifest["training"]["command"] = ""  # type: ignore[index]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 2, completed.stderr or completed.stdout)
+        report = json.loads(completed.stdout)
+        self.assertFalse(report["valid"])
+        self.assertTrue(any("license" in item for item in report["errors"]))
+
+    def test_external_checkpoint_cannot_have_bundled_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            manifest = self.manifest()
+            manifest["checkpoints"] = {"acquisition": "download from https://example.org/model", "paths": ["checkpoints/model.pt"]}
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("INVALID_CONFIG", categories)
+
+    def test_local_absolute_command_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = self.make_repo(directory)
+            manifest = self.manifest()
+            manifest["training"]["command"] = "python C:/Users/alice/private/train.py"  # type: ignore[index]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("UNSAFE_PATH", categories)
+
+    def test_parent_symlink_escape_is_reported_when_supported(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, tempfile.TemporaryDirectory() as outside:
+            root = self.make_repo(directory)
+            outside_root = Path(outside)
+            (outside_root / "README.md").write_text("outside\n", encoding="utf-8")
+            link = root / "linked"
+            try:
+                link.symlink_to(outside_root, target_is_directory=True)
+            except (OSError, NotImplementedError):
+                self.skipTest("symlink creation is not available")
+            manifest = self.manifest()
+            manifest["documentation"] = ["linked/README.md"]
+            completed = self.write_and_run(root, manifest)
+        self.assertEqual(completed.returncode, 1, completed.stderr or completed.stdout)
+        categories = [item["category"] for item in json.loads(completed.stdout)["findings"]]
+        self.assertIn("UNSAFE_PATH", categories)
 
     def test_invalid_json_config_is_reported(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
